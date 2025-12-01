@@ -1,0 +1,56 @@
+
+### 5. `/docs/architecture.mdx`
+
+```mdx
+---
+title: Architecture & Tech Stack
+description: How NextAdmin Pro is built to scale to millions
+---
+
+# Architecture
+
+Built for **performance**, **maintainability**, and **developer happiness**.
+
+## Tech Stack
+
+| Layer           | Technology                         |
+|----------------|------------------------------------|
+| Framework       | Next.js 14 (App Router)            |
+| Language        | TypeScript (Strict Mode)           |
+| Styling         | Tailwind CSS + Shadcn/ui           |
+| Data            | GraphQL + Apollo Client            |
+| State           | React Server Components + Zustand  |
+| Auth            | NextAuth.js                        |
+| AI              | Custom + OpenAI (optional)         |
+| Deployment      | Vercel (Optimized)                 |
+
+## Key Principles
+
+- **Zero `any` types** — Full type safety
+- **Server Components by default**
+- **Lazy loading** for heavy pages
+- **Bulk operations** supported
+- **Real-time ready** (WebSockets optional)
+
+## Folder Structure
+
+```
+/app
+  /admin          → All admin routes
+  /api            → Route handlers
+  /auth           → Authentication
+/components
+  /admin          → Reusable admin components
+  /ui             → Shadcn components
+/graphql
+  queries/        → All GraphQL queries
+  mutations/      → All mutations
+/lib
+  apollo.ts       → Apollo Client setup
+  utils.ts        → Helpers & formatters
+  ai/             → AI logic
+```
+
+> This project follows **best practices used by Stripe, Vercel, and Linear**
+```
+

@@ -1,0 +1,45 @@
+```mdx
+---
+title: Deploy in 1 Click
+description: Deploy NextAdmin Pro to Vercel in seconds
+---
+
+# Deploy to Production
+
+Deploy with **one click** on Vercel:
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/Mark-Lasfar/mgzon-docs)
+
+## Or manually:
+
+```bash
+git push vercel main
+```
+
+## Recommended Providers
+
+| Provider   | Why |
+|-----------|-----|
+| Vercel    | Best Next.js performance |
+| Railway   | Great for full-stack |
+| Render    | Simple & reliable |
+
+## Environment Variables (Production)
+
+```env
+NEXT_PUBLIC_APP_URL=https://yourdomain.com
+GRAPHQL_ENDPOINT=https://api.yourdomain.com/graphql
+DATABASE_URL=postgresql://...
+NEXTAUTH_SECRET=generate-with-openssl
+```
+
+## SSL & Custom Domain
+
+Automatically handled by Vercel
+
+Your admin panel is now live at:  
+https://yourdomain.com/admin
+
+**You're officially running a world-class admin panel.**
+```
+
