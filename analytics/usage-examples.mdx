@@ -1,0 +1,1253 @@
+```mdx
+---
+title: Usage Examples
+description: Practical examples of using the Analytics System
+---
+
+# Usage Examples
+
+## Quick Start
+
+### 1. Basic Store Analytics
+
+```typescript
+import { AnalyticsClient } from '@yourplatform/analytics-sdk';
+
+// Initialize client
+const client = new AnalyticsClient({
+  apiKey: 'your_api_key_here'
+});
+
+// Get store overview
+async function getStoreOverview() {
+  const analytics = await client.getStoreAnalytics({
+    slug: 'my-store',
+    period: '30d'
+  });
+  
+  console.log('Store Overview:', {
+    revenue: analytics.overview.totalRevenue,
+    orders: analytics.overview.totalOrders,
+    conversionRate: analytics.overview.conversionRate,
+    visitors: analytics.traffic.totalVisitors
+  });
+  
+  return analytics;
+}
+```
+
+### 2. Real-time Dashboard
+
+```typescript
+import React, { useState, useEffect } from 'react';
+import { useAnalytics } from '@yourplatform/analytics-sdk/react';
+
+function StoreDashboard({ storeId }) {
+  const { data: overview, isLoading } = useAnalytics.overview(storeId, {
+    period: '7d',
+    refreshInterval: 30000 // Refresh every 30 seconds
+  });
+  
+  if (isLoading) {
+    return <div>Loading analytics...</div>;
+  }
+  
+  return (
+    <div className="dashboard">
+      <div className="metrics-grid">
+        <MetricCard
+          title="Revenue"
+          value={`$${overview.totalRevenue.toLocaleString()}`}
+          change={overview.revenueChange}
+          icon="💰"
+        />
+        <MetricCard
+          title="Orders"
+          value={overview.totalOrders.toLocaleString()}
+          change={overview.ordersChange}
+          icon="🛒"
+        />
+        <MetricCard
+          title="Conversion Rate"
+          value={`${overview.conversionRate.toFixed(2)}%`}
+          change={overview.conversionChange}
+          icon="📊"
+        />
+        <MetricCard
+          title="Visitors"
+          value={overview.totalVisitors.toLocaleString()}
+          change={overview.visitorsChange}
+          icon="👥"
+        />
+      </div>
+      
+      <ChartsSection data={overview} />
+    </div>
+  );
+}
+```
+
+## Complete Examples
+
+### E-commerce Store Analytics Dashboard
+
+```typescript
+import React, { useState, useEffect } from 'react';
+import {
+  LineChart,
+  BarChart,
+  PieChart,
+  MetricCard,
+  DataTable,
+  DateRangePicker
+} from '@yourplatform/analytics-ui';
+
+function EcommerceAnalyticsDashboard() {
+  const [storeId, setStoreId] = useState('store_123');
+  const [dateRange, setDateRange] = useState({
+    start: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+    end: new Date()
+  });
+  const [metrics, setMetrics] = useState({
+    overview: null,
+    sales: null,
+    traffic: null,
+    products: null,
+    customers: null
+  });
+  
+  // Fetch all analytics data
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      try {
+        const [
+          overview,
+          sales,
+          traffic,
+          products,
+          customers
+        ] = await Promise.all([
+          client.getStoreOverviewAnalytics(storeId, dateRange),
+          client.getAdvancedSalesAnalytics(storeId, dateRange),
+          client.getAdvancedTrafficAnalytics(storeId, dateRange),
+          client.getAdvancedProductsAnalytics(storeId, dateRange),
+          client.getAdvancedCustomersAnalytics(storeId, dateRange)
+        ]);
+        
+        setMetrics({ overview, sales, traffic, products, customers });
+      } catch (error) {
+        console.error('Failed to fetch analytics:', error);
+      }
+    };
+    
+    fetchAnalytics();
+  }, [storeId, dateRange]);
+  
+  return (
+    <div className="ecommerce-analytics">
+      <header className="dashboard-header">
+        <h1>Store Analytics Dashboard</h1>
+        <DateRangePicker value={dateRange} onChange={setDateRange} />
+      </header>
+      
+      {/* Overview Metrics */}
+      <section className="overview-metrics">
+        <h2>📊 Performance Overview</h2>
+        <div className="metrics-grid">
+          <MetricCard
+            title="Total Revenue"
+            value={`$${metrics.overview?.totalRevenue.toLocaleString() || '0'}`}
+            trend={metrics.overview?.revenueChange}
+            format="currency"
+          />
+          <MetricCard
+            title="Total Orders"
+            value={metrics.overview?.totalOrders.toLocaleString() || '0'}
+            trend={metrics.overview?.ordersChange}
+            format="number"
+          />
+          <MetricCard
+            title="Conversion Rate"
+            value={`${metrics.overview?.conversionRate.toFixed(2) || '0'}%`}
+            trend={metrics.overview?.conversionChange}
+            format="percentage"
+          />
+          <MetricCard
+            title="Avg Order Value"
+            value={`$${metrics.overview?.averageOrderValue.toFixed(2) || '0'}`}
+            trend={metrics.overview?.aovChange}
+            format="currency"
+          />
+        </div>
+      </section>
+      
+      {/* Charts Section */}
+      <section className="charts-section">
+        <div className="chart-row">
+          <div className="chart-container">
+            <h3>Revenue Trends</h3>
+            <LineChart
+              data={metrics.sales?.trends.daily || []}
+              xField="date"
+              yField="revenue"
+              color="#4CAF50"
+            />
+          </div>
+          
+          <div className="chart-container">
+            <h3>Traffic Sources</h3>
+            <PieChart
+              data={metrics.traffic?.sources || []}
+              nameField="source"
+              valueField="percentage"
+            />
+          </div>
+        </div>
+        
+        <div className="chart-row">
+          <div className="chart-container">
+            <h3>Top Products</h3>
+            <BarChart
+              data={metrics.products?.bestSellers.slice(0, 10) || []}
+              xField="name"
+              yField="revenue"
+              color="#2196F3"
+            />
+          </div>
+          
+          <div className="chart-container">
+            <h3>Device Distribution</h3>
+            <PieChart
+              data={metrics.traffic?.devices || []}
+              nameField="device"
+              valueField="percentage"
+            />
+          </div>
+        </div>
+      </section>
+      
+      {/* Data Tables */}
+      <section className="tables-section">
+        <div className="table-container">
+          <h3>Recent Orders</h3>
+          <DataTable
+            columns={[
+              { key: 'orderNumber', header: 'Order #' },
+              { key: 'customer', header: 'Customer' },
+              { key: 'total', header: 'Total', format: 'currency' },
+              { key: 'status', header: 'Status' },
+              { key: 'createdAt', header: 'Date', format: 'date' }
+            ]}
+            data={metrics.sales?.recentOrders || []}
+            pagination={true}
+            pageSize={10}
+          />
+        </div>
+        
+        <div className="table-container">
+          <h3>Top Customers</h3>
+          <DataTable
+            columns={[
+              { key: 'name', header: 'Customer' },
+              { key: 'totalSpent', header: 'Total Spent', format: 'currency' },
+              { key: 'orderCount', header: 'Orders' },
+              { key: 'avgOrderValue', header: 'Avg Order', format: 'currency' },
+              { key: 'lastOrder', header: 'Last Order', format: 'date' }
+            ]}
+            data={metrics.customers?.topCustomers || []}
+            pagination={true}
+            pageSize={10}
+          />
+        </div>
+      </section>
+      
+      {/* Insights & Recommendations */}
+      {metrics.overview?.insights && (
+        <section className="insights-section">
+          <h2>💡 Insights & Recommendations</h2>
+          <div className="insights-grid">
+            <div className="insights-card">
+              <h4>Key Insights</h4>
+              <ul>
+                {metrics.overview.insights.map((insight, index) => (
+                  <li key={index}>{insight}</li>
+                ))}
+              </ul>
+            </div>
+            
+            <div className="recommendations-card">
+              <h4>Recommended Actions</h4>
+              <ul>
+                {metrics.overview.recommendations.map((rec, index) => (
+                  <li key={index}>{rec}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+```
+
+### Real-time Event Tracking
+
+```typescript
+// E-commerce event tracking implementation
+class EcommerceTracker {
+  private client: AnalyticsClient;
+  private sessionId: string;
+  private visitorId: string;
+  
+  constructor(apiKey: string) {
+    this.client = new AnalyticsClient({ apiKey });
+    this.sessionId = this.generateSessionId();
+    this.visitorId = this.getOrCreateVisitorId();
+  }
+  
+  // Track product views
+  async trackProductView(product: Product) {
+    await this.client.trackEvent({
+      eventName: 'product_view',
+      sessionId: this.sessionId,
+      visitorId: this.visitorId,
+      properties: {
+        productId: product.id,
+        productName: product.name,
+        category: product.category,
+        price: product.price,
+        sku: product.sku,
+        url: window.location.href,
+        referrer: document.referrer
+      }
+    });
+  }
+  
+  // Track add to cart
+  async trackAddToCart(product: Product, quantity: number = 1) {
+    await this.client.trackEvent({
+      eventName: 'add_to_cart',
+      sessionId: this.sessionId,
+      visitorId: this.visitorId,
+      properties: {
+        productId: product.id,
+        productName: product.name,
+        quantity,
+        price: product.price,
+        cartValue: product.price * quantity,
+        currency: 'USD'
+      }
+    });
+  }
+  
+  // Track checkout
+  async trackCheckout(cart: Cart) {
+    await this.client.trackEvent({
+      eventName: 'begin_checkout',
+      sessionId: this.sessionId,
+      visitorId: this.visitorId,
+      properties: {
+        cartId: cart.id,
+        items: cart.items.map(item => ({
+          productId: item.productId,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        totalValue: cart.total,
+        itemCount: cart.items.length,
+        currency: 'USD'
+      }
+    });
+  }
+  
+  // Track purchase
+  async trackPurchase(order: Order) {
+    await this.client.trackEvent({
+      eventName: 'purchase',
+      sessionId: this.sessionId,
+      visitorId: this.visitorId,
+      properties: {
+        orderId: order.id,
+        transactionId: order.transactionId,
+        value: order.total,
+        tax: order.tax,
+        shipping: order.shipping,
+        currency: order.currency,
+        paymentMethod: order.paymentMethod,
+        items: order.items.map(item => ({
+          productId: item.productId,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+          category: item.category
+        })),
+        customerId: order.customerId,
+        coupon: order.coupon
+      }
+    });
+    
+    // Update visitor to customer
+    await this.client.identifyVisitor(this.visitorId, {
+      customerId: order.customerId,
+      email: order.email,
+      firstPurchaseDate: new Date().toISOString()
+    });
+  }
+  
+  // Track custom events
+  async trackCustomEvent(eventName: string, properties: any = {}) {
+    await this.client.trackEvent({
+      eventName,
+      sessionId: this.sessionId,
+      visitorId: this.visitorId,
+      properties: {
+        ...properties,
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        screenResolution: `${window.screen.width}x${window.screen.height}`,
+        language: navigator.language
+      }
+    });
+  }
+  
+  private generateSessionId(): string {
+    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+  
+  private getOrCreateVisitorId(): string {
+    let visitorId = localStorage.getItem('visitor_id');
+    if (!visitorId) {
+      visitorId = `visitor_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem('visitor_id', visitorId);
+    }
+    return visitorId;
+  }
+}
+
+// Usage in React component
+function ProductPage({ product }) {
+  const tracker = useRef(new EcommerceTracker('your_api_key'));
+  
+  useEffect(() => {
+    // Track product view when page loads
+    tracker.current.trackProductView(product);
+    
+    // Track time on page
+    const startTime = Date.now();
+    return () => {
+      const timeSpent = Date.now() - startTime;
+      tracker.current.trackCustomEvent('time_on_page', {
+        page: 'product',
+        productId: product.id,
+        timeSpentMs: timeSpent,
+        timeSpentSeconds: Math.floor(timeSpent / 1000)
+      });
+    };
+  }, [product]);
+  
+  const handleAddToCart = async () => {
+    await tracker.current.trackAddToCart(product);
+    // Add to cart logic...
+  };
+  
+  return (
+    <div className="product-page">
+      <h1>{product.name}</h1>
+      <button onClick={handleAddToCart}>Add to Cart</button>
+    </div>
+  );
+}
+```
+
+### Automated Reporting System
+
+```typescript
+// Automated daily/weekly/monthly reporting
+class AutomatedReporter {
+  private client: AnalyticsClient;
+  private emailService: EmailService;
+  
+  constructor() {
+    this.client = new AnalyticsClient({ apiKey: process.env.ANALYTICS_API_KEY });
+    this.emailService = new EmailService();
+  }
+  
+  // Generate and send daily report
+  async sendDailyReport(storeId: string, recipients: string[]) {
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const dateRange = {
+      start: new Date(yesterday.setHours(0, 0, 0, 0)),
+      end: new Date(yesterday.setHours(23, 59, 59, 999))
+    };
+    
+    // Generate report
+    const report = await this.client.generateAnalyticsReport(storeId, dateRange, {
+      type: 'summary',
+      format: 'html'
+    });
+    
+    // Get store info
+    const storeInfo = await this.client.getStoreInfo(storeId);
+    
+    // Prepare email
+    const emailContent = this.generateEmailTemplate({
+      storeName: storeInfo.name,
+      period: 'Daily',
+      date: yesterday.toLocaleDateString(),
+      metrics: report.overview,
+      insights: report.insights,
+      topProducts: report.products.bestSellers.slice(0, 5),
+      charts: report.charts
+    });
+    
+    // Send to recipients
+    for (const recipient of recipients) {
+      await this.emailService.send({
+        to: recipient,
+        subject: `Daily Analytics Report - ${storeInfo.name} - ${yesterday.toLocaleDateString()}`,
+        html: emailContent,
+        attachments: [
+          {
+            filename: `daily_report_${storeId}_${yesterday.toISOString().split('T')[0]}.csv`,
+            content: report.exportFormats.csv
+          }
+        ]
+      });
+    }
+    
+    console.log(`Daily report sent to ${recipients.length} recipients`);
+  }
+  
+  // Schedule reports
+  scheduleReports() {
+    // Daily at 9 AM
+    cron.schedule('0 9 * * *', () => {
+      this.sendDailyReport('store_123', ['owner@store.com', 'manager@store.com']);
+    });
+    
+    // Weekly on Monday at 10 AM
+    cron.schedule('0 10 * * 1', () => {
+      this.sendWeeklyReport('store_123', ['team@store.com']);
+    });
+    
+    // Monthly on 1st at 11 AM
+    cron.schedule('0 11 1 * *', () => {
+      this.sendMonthlyReport('store_123', ['executive@company.com']);
+    });
+  }
+  
+  private generateEmailTemplate(data: any): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; }
+          .metric { margin: 10px 0; padding: 15px; background: #f5f5f5; border-radius: 5px; }
+          .positive { color: green; }
+          .negative { color: red; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { padding: 8px; text-align: left; border-bottom: 1px solid #ddd; }
+        </style>
+      </head>
+      <body>
+        <h1>${data.period} Analytics Report - ${data.storeName}</h1>
+        <h2>📅 ${data.date}</h2>
+        
+        <div class="metrics">
+          <h3>Key Metrics</h3>
+          <div class="metric">
+            <strong>Revenue:</strong> $${data.metrics.totalRevenue.toLocaleString()}
+          </div>
+          <div class="metric">
+            <strong>Orders:</strong> ${data.metrics.totalOrders.toLocaleString()}
+          </div>
+          <div class="metric">
+            <strong>Conversion Rate:</strong> ${data.metrics.conversionRate.toFixed(2)}%
+          </div>
+        </div>
+        
+        ${data.insights.length > 0 ? `
+        <div class="insights">
+          <h3>💡 Insights</h3>
+          <ul>
+            ${data.insights.map(insight => `<li>${insight}</li>`).join('')}
+          </ul>
+        </div>
+        ` : ''}
+        
+        ${data.topProducts.length > 0 ? `
+        <div class="top-products">
+          <h3>🏆 Top Products</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Sales</th>
+                <th>Revenue</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.topProducts.map(product => `
+                <tr>
+                  <td>${product.name}</td>
+                  <td>${product.totalSold}</td>
+                  <td>$${product.totalRevenue.toLocaleString()}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+        ` : ''}
+        
+        <p>
+          <a href="https://analytics.yourplatform.com/reports/${data.storeId}">
+            View Full Report →
+          </a>
+        </p>
+        
+        <footer>
+          <p>This is an automated report. To adjust settings, visit your analytics dashboard.</p>
+        </footer>
+      </body>
+      </html>
+    `;
+  }
+}
+
+// Initialize and schedule
+const reporter = new AutomatedReporter();
+reporter.scheduleReports();
+```
+
+### Custom Analytics Widget
+
+```typescript
+// Custom analytics widget for embedding
+class AnalyticsWidget {
+  private container: HTMLElement;
+  private client: AnalyticsClient;
+  private config: WidgetConfig;
+  
+  constructor(containerId: string, config: WidgetConfig) {
+    this.container = document.getElementById(containerId);
+    if (!this.container) {
+      throw new Error(`Container #${containerId} not found`);
+    }
+    
+    this.config = config;
+    this.client = new AnalyticsClient({
+      apiKey: config.apiKey,
+      baseUrl: config.baseUrl
+    });
+    
+    this.initialize();
+  }
+  
+  private async initialize() {
+    // Load CSS
+    this.loadStyles();
+    
+    // Create widget structure
+    this.container.innerHTML = this.getWidgetTemplate();
+    
+    // Fetch and render data
+    await this.loadData();
+    
+    // Set up auto-refresh
+    if (this.config.autoRefresh) {
+      setInterval(() => this.loadData(), this.config.refreshInterval || 30000);
+    }
+  }
+  
+  private async loadData() {
+    try {
+      const analytics = await this.client.getStoreAnalytics({
+        slug: this.config.storeSlug,
+        period: this.config.period || '30d'
+      });
+      
+      this.renderData(analytics);
+    } catch (error) {
+      this.renderError(error);
+    }
+  }
+  
+  private renderData(analytics: any) {
+    const metricsContainer = this.container.querySelector('.widget-metrics');
+    if (metricsContainer) {
+      metricsContainer.innerHTML = `
+        <div class="metric">
+          <div class="metric-value">$${analytics.overview.totalRevenue.toLocaleString()}</div>
+          <div class="metric-label">Revenue</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">${analytics.overview.totalOrders.toLocaleString()}</div>
+          <div class="metric-label">Orders</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">${analytics.overview.conversionRate.toFixed(2)}%</div>
+          <div class="metric-label">Conversion</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value">${analytics.traffic.totalVisitors.toLocaleString()}</div>
+          <div class="metric-label">Visitors</div>
+        </div>
+      `;
+    }
+  }
+  
+  private getWidgetTemplate(): string {
+    return `
+      <div class="analytics-widget">
+        <div class="widget-header">
+          <h3>${this.config.title || 'Store Analytics'}</h3>
+          ${this.config.showPeriod ? `
+            <select class="period-selector">
+              <option value="7d">Last 7 days</option>
+              <option value="30d" selected>Last 30 days</option>
+              <option value="90d">Last 90 days</option>
+            </select>
+          ` : ''}
+        </div>
+        <div class="widget-metrics">
+          <div class="loading">Loading analytics...</div>
+        </div>
+        ${this.config.showLink ? `
+          <div class="widget-footer">
+            <a href="${this.config.dashboardUrl}" target="_blank">
+              View Full Dashboard →
+            </a>
+          </div>
+        ` : ''}
+      </div>
+    `;
+  }
+  
+  private loadStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+      .analytics-widget {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 20px;
+        background: white;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      }
+      .widget-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+      }
+      .widget-header h3 {
+        margin: 0;
+        font-size: 18px;
+        color: #333;
+      }
+      .widget-metrics {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+      }
+      .metric {
+        text-align: center;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 6px;
+      }
+      .metric-value {
+        font-size: 24px;
+        font-weight: bold;
+        color: #007bff;
+        margin-bottom: 5px;
+      }
+      .metric-label {
+        font-size: 14px;
+        color: #666;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .widget-footer {
+        margin-top: 20px;
+        text-align: center;
+        padding-top: 15px;
+        border-top: 1px solid #e0e0e0;
+      }
+      .widget-footer a {
+        color: #007bff;
+        text-decoration: none;
+        font-size: 14px;
+      }
+      .widget-footer a:hover {
+        text-decoration: underline;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+}
+
+// Usage on any website
+// <div id="analytics-widget"></div>
+// <script>
+//   new AnalyticsWidget('analytics-widget', {
+//     apiKey: 'your_api_key',
+//     storeSlug: 'my-store',
+//     title: 'My Store Performance',
+//     showPeriod: true,
+//     showLink: true,
+//     autoRefresh: true,
+//     refreshInterval: 60000
+//   });
+// </script>
+```
+
+### Advanced: Custom Metric Calculations
+
+```typescript
+// Custom metric calculations and aggregations
+class CustomMetricsCalculator {
+  // Calculate Customer Lifetime Value (LTV)
+  calculateLTV(customers: Customer[], orders: Order[]): Map<string, number> {
+    const customerLTV = new Map<string, number>();
+    
+    for (const customer of customers) {
+      const customerOrders = orders.filter(order => 
+        order.customerId === customer.id
+      );
+      
+      const totalSpent = customerOrders.reduce((sum, order) => 
+        sum + order.total, 0
+      );
+      
+      const firstOrder = customerOrders.length > 0
+        ? new Date(Math.min(...customerOrders.map(o => o.createdAt.getTime())))
+        : new Date();
+      
+      const daysAsCustomer = Math.max(
+        1,
+        Math.floor((Date.now() - firstOrder.getTime()) / (1000 * 60 * 60 * 24))
+      );
+      
+      // LTV = total spent / days as customer * average customer lifespan (365 days)
+      const ltv = (totalSpent / daysAsCustomer) * 365;
+      customerLTV.set(customer.id, ltv);
+    }
+    
+    return customerLTV;
+  }
+  
+  // Calculate Customer Acquisition Cost (CAC)
+  calculateCAC(
+    marketingSpend: number,
+    newCustomers: number,
+    period: string = 'month'
+  ): number {
+    if (newCustomers === 0) return 0;
+    
+    let periodMultiplier = 1;
+    switch (period) {
+      case 'day': periodMultiplier = 30; break;
+      case 'week': periodMultiplier = 4; break;
+      case 'month': periodMultiplier = 1; break;
+      case 'year': periodMultiplier = 1/12; break;
+    }
+    
+    return (marketingSpend * periodMultiplier) / newCustomers;
+  }
+  
+  // Calculate Return on Advertising Spend (ROAS)
+  calculateROAS(
+    revenue: number,
+    adSpend: number
+  ): number {
+    if (adSpend === 0) return 0;
+    return revenue / adSpend;
+  }
+  
+  // Calculate Shopping Cart Abandonment Rate
+  calculateAbandonmentRate(
+    sessionsWithAddToCart: number,
+    sessionsWithPurchase: number
+  ): number {
+    if (sessionsWithAddToCart === 0) return 0;
+    return ((sessionsWithAddToCart - sessionsWithPurchase) / sessionsWithAddToCart) * 100;
+  }
+  
+  // Calculate Product Performance Score
+  calculateProductScore(product: Product, metrics: ProductMetrics): number {
+    const weights = {
+      conversionRate: 0.3,
+      revenue: 0.25,
+      views: 0.15,
+      stockHealth: 0.15,
+      profitMargin: 0.15
+    };
+    
+    // Normalize metrics (0-100 scale)
+    const normalized = {
+      conversionRate: Math.min(100, (metrics.conversionRate || 0) * 10), // 0-10% -> 0-100
+      revenue: Math.min(100, (metrics.revenue || 0) / 1000), // $0-1000 -> 0-100
+      views: Math.min(100, (metrics.views || 0) / 100), // 0-100 views -> 0-100
+      stockHealth: product.countInStock > 10 ? 100 : 
+                   product.countInStock > 5 ? 70 :
+                   product.countInStock > 0 ? 30 : 0,
+      profitMargin: Math.min(100, (metrics.profitMargin || 0) * 2) // 0-50% -> 0-100
+    };
+    
+    // Calculate weighted score
+    const score = Object.entries(weights).reduce((sum, [key, weight]) => {
+      return sum + (normalized[key] * weight);
+    }, 0);
+    
+    return Math.round(score);
+  }
+}
+
+// Usage
+const calculator = new CustomMetricsCalculator();
+const ltvMap = calculator.calculateLTV(customers, orders);
+const cac = calculator.calculateCAC(5000, 100, 'month');
+const roas = calculator.calculateROAS(25000, 5000);
+```
+
+### Real-time Alert System
+
+```typescript
+// Real-time anomaly detection and alerts
+class AnalyticsAlertSystem {
+  private thresholds: AlertThresholds;
+  private notificationChannels: NotificationChannel[];
+  private lastMetrics: Map<string, number> = new Map();
+  
+  constructor() {
+    this.thresholds = {
+      conversionRate: { min: 1, max: 10, change: 0.5 },
+      revenue: { min: 100, max: 10000, change: 0.2 },
+      visitors: { min: 50, max: 5000, change: 0.3 },
+      bounceRate: { min: 20, max: 80, change: 0.15 }
+    };
+    
+    this.notificationChannels = [
+      new EmailChannel(),
+      new SlackChannel(),
+      new WebhookChannel()
+    ];
+  }
+  
+  async monitorStore(storeId: string) {
+    // Check metrics every 5 minutes
+    setInterval(async () => {
+      try {
+        const metrics = await this.getCurrentMetrics(storeId);
+        await this.checkThresholds(storeId, metrics);
+        this.lastMetrics.set(storeId, metrics);
+      } catch (error) {
+        console.error(`Monitoring failed for store ${storeId}:`, error);
+      }
+    }, 5 * 60 * 1000);
+  }
+  
+  private async checkThresholds(storeId: string, metrics: StoreMetrics) {
+    const alerts: Alert[] = [];
+    
+    // Check each metric against thresholds
+    for (const [metric, value] of Object.entries(metrics)) {
+      const threshold = this.thresholds[metric];
+      if (!threshold) continue;
+      
+      // Check absolute thresholds
+      if (value < threshold.min) {
+        alerts.push({
+          type: 'threshold_min',
+          metric,
+          value,
+          threshold: threshold.min,
+          severity: 'warning',
+          message: `${metric} is below minimum threshold (${value} < ${threshold.min})`
+        });
+      }
+      
+      if (value > threshold.max) {
+        alerts.push({
+          type: 'threshold_max',
+          metric,
+          value,
+          threshold: threshold.max,
+          severity: 'warning',
+          message: `${metric} is above maximum threshold (${value} > ${threshold.max})`
+        });
+      }
+      
+      // Check for sudden changes
+      const lastValue = this.lastMetrics.get(storeId)?.[metric];
+      if (lastValue !== undefined) {
+        const change = Math.abs((value - lastValue) / lastValue);
+        if (change > threshold.change) {
+          alerts.push({
+            type: 'sudden_change',
+            metric,
+            value,
+            previousValue: lastValue,
+            change: change * 100,
+            severity: 'critical',
+            message: `${metric} changed by ${(change * 100).toFixed(1)}% (${lastValue} → ${value})`
+          });
+        }
+      }
+    }
+    
+    // Send alerts if any
+    if (alerts.length > 0) {
+      await this.sendAlerts(storeId, alerts);
+    }
+  }
+  
+  private async sendAlerts(storeId: string, alerts: Alert[]) {
+    const storeInfo = await this.getStoreInfo(storeId);
+    
+    for (const channel of this.notificationChannels) {
+      try {
+        await channel.send({
+          store: storeInfo,
+          alerts,
+          timestamp: new Date(),
+          dashboardUrl: `https://analytics.yourplatform.com/stores/${storeId}/alerts`
+        });
+      } catch (error) {
+        console.error(`Failed to send alert via ${channel.name}:`, error);
+      }
+    }
+  }
+}
+
+// Usage
+const alertSystem = new AnalyticsAlertSystem();
+alertSystem.monitorStore('store_123');
+```
+
+## Integration Examples
+
+### Next.js Integration
+
+```typescript
+// pages/_app.tsx
+import type { AppProps } from 'next/app';
+import { AnalyticsProvider } from '@yourplatform/analytics-sdk/react';
+
+function MyApp({ Component, pageProps }: AppProps) {
+  return (
+    <AnalyticsProvider
+      apiKey={process.env.NEXT_PUBLIC_ANALYTICS_API_KEY}
+      trackPageViews={true}
+      trackOutboundLinks={true}
+      autoTrack={true}
+    >
+      <Component {...pageProps} />
+    </AnalyticsProvider>
+  );
+}
+
+export default MyApp;
+
+// pages/products/[id].tsx
+import { useAnalytics } from '@yourplatform/analytics-sdk/react';
+
+export default function ProductPage({ product }) {
+  const { trackEvent } = useAnalytics();
+  
+  useEffect(() => {
+    // Track product view
+    trackEvent('product_view', {
+      productId: product.id,
+      productName: product.name,
+      category: product.category,
+      price: product.price
+    });
+  }, [product]);
+  
+  return (
+    <div>
+      <h1>{product.name}</h1>
+      <p>Price: ${product.price}</p>
+      {/* Product content */}
+    </div>
+  );
+}
+
+export async function getServerSideProps(context) {
+  // Your data fetching logic
+  return {
+    props: {
+      product: {
+        id: context.params.id,
+        name: 'Sample Product',
+        price: 99.99,
+        category: 'Electronics'
+      }
+    }
+  };
+}
+```
+
+### React Native Integration
+
+```typescript
+// App.js
+import { AnalyticsProvider } from '@yourplatform/analytics-sdk/react-native';
+
+export default function App() {
+  return (
+    <AnalyticsProvider
+      apiKey={Config.ANALYTICS_API_KEY}
+      trackScreenViews={true}
+      trackAppLifecycle={true}
+    >
+      <NavigationContainer>
+        <Stack.Navigator>
+          <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Product" component={ProductScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </AnalyticsProvider>
+  );
+}
+
+// ProductScreen.js
+import { useAnalytics } from '@yourplatform/analytics-sdk/react-native';
+
+function ProductScreen({ route }) {
+  const { product } = route.params;
+  const { trackEvent } = useAnalytics();
+  
+  useEffect(() => {
+    // Track screen view
+    trackEvent('screen_view', {
+      screen_name: 'Product',
+      product_id: product.id,
+      product_name: product.name
+    });
+  }, []);
+  
+  const handlePurchase = async () => {
+    await trackEvent('purchase', {
+      product_id: product.id,
+      value: product.price,
+      currency: 'USD'
+    });
+    
+    // Your purchase logic
+  };
+  
+  return (
+    <View>
+      <Text>{product.name}</Text>
+      <Button title="Buy Now" onPress={handlePurchase} />
+    </View>
+  );
+}
+```
+
+## Performance Tips
+
+### 1. Optimize API Calls
+
+```typescript
+// Batch multiple requests
+class BatchedAnalytics {
+  private batch: Map<string, Promise<any>> = new Map();
+  private batchTimeout: number = 100; // ms
+  
+  async getMultipleMetrics(storeId: string, metricTypes: string[]) {
+    const batchKey = `${storeId}_${Date.now()}`;
+    
+    // Check if batch already exists
+    if (this.batch.has(batchKey)) {
+      return this.batch.get(batchKey);
+    }
+    
+    // Create new batch
+    const batchPromise = new Promise(async (resolve) => {
+      // Wait for batch window
+      await this.wait(this.batchTimeout);
+      
+      // Execute batched requests
+      const results = await Promise.all(
+        metricTypes.map(type => 
+          this.getSingleMetric(storeId, type)
+        )
+      );
+      
+      // Format results
+      const formatted = metricTypes.reduce((acc, type, index) => {
+        acc[type] = results[index];
+        return acc;
+      }, {});
+      
+      resolve(formatted);
+      
+      // Clean up
+      this.batch.delete(batchKey);
+    });
+    
+    this.batch.set(batchKey, batchPromise);
+    return batchPromise;
+  }
+  
+  private wait(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+```
+
+### 2. Cache Strategies
+
+```typescript
+// Implement caching with stale-while-revalidate
+class SWRCache {
+  private cache: Map<string, { data: any, timestamp: number }> = new Map();
+  private staleTime: number = 5 * 60 * 1000; // 5 minutes
+  private maxAge: number = 30 * 60 * 1000; // 30 minutes
+  
+  async get(key: string, fetcher: () => Promise<any>): Promise<any> {
+    const cached = this.cache.get(key);
+    const now = Date.now();
+    
+    // Return cached data if still fresh
+    if (cached && now - cached.timestamp < this.staleTime) {
+      return cached.data;
+    }
+    
+    // If stale but not expired, return cached and refresh in background
+    if (cached && now - cached.timestamp < this.maxAge) {
+      this.refreshInBackground(key, fetcher);
+      return cached.data;
+    }
+    
+    // Otherwise fetch fresh data
+    const data = await fetcher();
+    this.cache.set(key, { data, timestamp: now });
+    return data;
+  }
+  
+  private async refreshInBackground(key: string, fetcher: () => Promise<any>) {
+    try {
+      const data = await fetcher();
+      this.cache.set(key, { data, timestamp: Date.now() });
+    } catch (error) {
+      console.warn(`Background refresh failed for ${key}:`, error);
+    }
+  }
+}
+```
+
+---
+
+*Usage Examples version: 1.3.0*
+*Last updated: April 2024*
+```
