@@ -1,0 +1,610 @@
+```mdx
+---
+title: API Reference
+description: Complete API documentation for Analytics System
+---
+
+# API Reference
+
+## GraphQL API
+
+### Schema Overview
+
+```graphql
+type Query {
+  # Store Analytics
+  getStoreAnalytics(
+    slug: String!
+    period: String = "30d"
+    startDate: String
+    endDate: String
+    metricType: AnalyticsMetricType = OVERVIEW
+  ): StoreAnalyticsResponse
+  
+  getAdvancedSalesAnalytics(
+    storeId: ID!
+    dateRange: DateRangeInput!
+  ): AdvancedSalesAnalytics
+  
+  getAdvancedTrafficAnalytics(
+    storeId: ID!
+    dateRange: DateRangeInput!
+  ): AdvancedTrafficAnalytics
+  
+  getAdvancedProductsAnalytics(
+    storeId: ID!
+    dateRange: DateRangeInput!
+  ): AdvancedProductsAnalytics
+  
+  getAdvancedCustomersAnalytics(
+    storeId: ID!
+    dateRange: DateRangeInput!
+  ): AdvancedCustomersAnalytics
+  
+  # Dashboard
+  getStoreDashboard(
+    storeId: String!
+    userId: String!
+  ): StoreDashboard
+  
+  # Integrations
+  getAnalyticsIntegrationsStatus(
+    storeId: ID!
+    sellerId: ID
+  ): [IntegrationAnalytics]!
+  
+  # Reports
+  generateAnalyticsReport(
+    storeId: ID!
+    dateRange: DateRangeInput!
+    sellerId: ID
+    reportType: ReportType = SUMMARY
+  ): AnalyticsReport
+}
+
+type Mutation {
+  # Data Management
+  refreshAnalyticsFromIntegrations(
+    storeId: ID!
+    sellerId: ID
+  ): RefreshResponse
+  
+  # Event Tracking
+  trackAnalyticsEvent(
+    event: AnalyticsEventInput!
+  ): EventTrackingResponse
+  
+  # Integration Management
+  connectAnalyticsIntegration(
+    providerId: ID!
+    credentials: JSON!
+    settings: JSON
+  ): IntegrationResponse
+  
+  disconnectAnalyticsIntegration(
+    integrationId: ID!
+  ): IntegrationResponse
+}
+```
+
+### Types
+
+#### StoreAnalyticsResponse
+
+```graphql
+type StoreAnalyticsResponse {
+  store: StoreInfo
+  period: PeriodInfo
+  overview: StoreOverview
+  traffic: TrafficOverview
+  products: ProductsOverview
+  customers: CustomersOverview
+  integrations: [IntegrationStatus]
+  insights: [String]
+  recommendations: [String]
+  dataSources: DataSourceInfo
+}
+
+type StoreOverview {
+  totalRevenue: Float
+  totalOrders: Int
+  conversionRate: Float
+  averageOrderValue: Float
+  totalVisitors: Int
+  uniqueVisitors: Int
+  bounceRate: Float
+  avgSessionDuration: Float
+  pagesPerSession: Float
+  totalProducts: Int
+  activeProducts: Int
+  inventoryValue: Float
+  totalCustomers: Int
+  newCustomers: Int
+  repeatCustomers: Int
+  grossProfit: Float
+  netProfit: Float
+  platformCommission: Float
+  shippingCost: Float
+  revenuePerVisitor: Float
+  ordersPerVisitor: Float
+  revenuePerOrder: Float
+  customerLifetimeValue: Float
+}
+
+type TrafficOverview {
+  sources: [TrafficSource]
+  devices: [DeviceBreakdown]
+  geography: [GeographicData]
+  popularPages: [PopularPage]
+}
+
+type ProductsOverview {
+  bestSellers: [ProductAnalytics]
+  mostViewed: [ProductAnalytics]
+  lowStock: [ProductAnalytics]
+  categoryPerformance: [CategoryPerformance]
+}
+```
+
+### Example Queries
+
+#### Get Basic Store Analytics
+
+```graphql
+query GetStoreOverview($slug: String!, $period: String = "30d") {
+  getStoreAnalytics(slug: $slug, period: $period) {
+    store {
+      id
+      name
+      slug
+    }
+    period {
+      start
+      end
+      days
+    }
+    overview {
+      totalRevenue
+      totalOrders
+      conversionRate
+      averageOrderValue
+    }
+    traffic {
+      totalVisitors
+      uniqueVisitors
+      bounceRate
+      sources {
+        name
+        count
+        percentage
+        conversionRate
+      }
+    }
+  }
+}
+```
+
+#### Get Advanced Sales Analytics
+
+```graphql
+query GetSalesAnalytics($storeId: ID!, $startDate: String!, $endDate: String!) {
+  getAdvancedSalesAnalytics(
+    storeId: $storeId
+    dateRange: {
+      start: $startDate
+      end: $endDate
+    }
+  ) {
+    summary {
+      totalOrders
+      totalRevenue
+      averageOrderValue
+      totalItemsSold
+    }
+    trends {
+      daily {
+        date
+        orders
+        revenue
+        customers
+        avgOrderValue
+      }
+      hourly {
+        hour
+        count
+        revenue
+        avgOrderValue
+      }
+    }
+    categories {
+      category
+      totalSold
+      totalRevenue
+      avgPrice
+    }
+    topProducts {
+      name
+      totalSold
+      revenue
+      profit
+      margin
+    }
+  }
+}
+```
+
+## REST API
+
+### Base URL
+```
+https://api.mgzon.com/v1/analytics
+```
+
+### Authentication
+All endpoints require Bearer Token authentication:
+
+```http
+Authorization: Bearer <your_jwt_token>
+```
+
+### Endpoints
+
+#### 1. Store Analytics
+
+**GET /stores/{slug}/analytics/overview**
+
+```http
+GET /stores/my-store/analytics/overview?period=30d
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "store": {
+      "id": "store_123",
+      "name": "My Store",
+      "slug": "my-store"
+    },
+    "overview": {
+      "totalRevenue": 12450.00,
+      "totalOrders": 145,
+      "conversionRate": 3.2,
+      "averageOrderValue": 85.86
+    },
+    "traffic": {
+      "totalVisitors": 1250,
+      "uniqueVisitors": 890,
+      "bounceRate": 42.5,
+      "pagesPerSession": 3.7
+    }
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+**GET /stores/{slug}/analytics/sales**
+
+```http
+GET /stores/my-store/analytics/sales?start=2024-01-01&end=2024-01-31
+Authorization: Bearer <token>
+```
+
+#### 2. Event Tracking
+
+**POST /events/track**
+
+```http
+POST /events/track
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "eventName": "product_view",
+  "storeId": "store_123",
+  "userId": "user_456",
+  "properties": {
+    "productId": "prod_789",
+    "productName": "Wireless Headphones",
+    "category": "Electronics",
+    "price": 99.99
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+#### 3. Integrations Management
+
+**GET /integrations/status**
+
+```http
+GET /integrations/status?storeId=store_123
+Authorization: Bearer <token>
+```
+
+**POST /integrations/refresh**
+
+```http
+POST /integrations/refresh
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "storeId": "store_123",
+  "integrationIds": ["ga4_123", "fbpixel_456"]
+}
+```
+
+### Webhook Events
+
+The system sends webhook notifications for important events:
+
+```typescript
+interface WebhookPayload {
+  event: string;
+  storeId: string;
+  data: any;
+  timestamp: string;
+  signature: string;
+}
+
+// Available webhook events:
+const WEBHOOK_EVENTS = {
+  ANALYTICS_UPDATED: 'analytics.updated',
+  INTEGRATION_CONNECTED: 'integration.connected',
+  INTEGRATION_DISCONNECTED: 'integration.disconnected',
+  INTEGRATION_ERROR: 'integration.error',
+  REPORT_GENERATED: 'report.generated',
+  ANOMALY_DETECTED: 'anomaly.detected'
+};
+```
+
+#### Webhook Configuration
+
+```http
+POST /webhooks
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "url": "https://your-callback-url.com/webhooks/analytics",
+  "events": [
+    "analytics.updated",
+    "integration.error",
+    "anomaly.detected"
+  ],
+  "secret": "your_webhook_secret"
+}
+```
+
+## TypeScript/JavaScript SDK
+
+### Installation
+
+```bash
+npm install @mgzon/analytics-sdk
+# or
+yarn add @mgzon/analytics-sdk
+```
+
+### Initialization
+
+```typescript
+import { AnalyticsClient } from '@mgzon/analytics-sdk';
+
+const client = new AnalyticsClient({
+  apiKey: 'your_api_key',
+  baseUrl: 'https://api.mgzon.com/v1',
+  timeout: 30000,
+  retryAttempts: 3
+});
+```
+
+### Usage Examples
+
+#### Track Events
+
+```typescript
+// Track page view
+await client.trackEvent({
+  eventName: 'page_view',
+  storeId: 'store_123',
+  userId: 'user_456',
+  properties: {
+    page: '/products/headphones',
+    title: 'Wireless Headphones',
+    referrer: 'https://google.com'
+  }
+});
+
+// Track conversion
+await client.trackEvent({
+  eventName: 'purchase_completed',
+  storeId: 'store_123',
+  userId: 'user_456',
+  properties: {
+    orderId: 'order_789',
+    total: 199.99,
+    currency: 'USD',
+    items: [
+      { productId: 'prod_123', quantity: 1, price: 99.99 },
+      { productId: 'prod_456', quantity: 2, price: 50.00 }
+    ]
+  }
+});
+```
+
+#### Get Analytics Data
+
+```typescript
+// Get store overview
+const overview = await client.getStoreOverview('my-store', {
+  period: '30d'
+});
+
+console.log(overview.totalRevenue);
+console.log(overview.conversionRate);
+
+// Get sales analytics
+const salesData = await client.getSalesAnalytics('store_123', {
+  start: '2024-01-01',
+  end: '2024-01-31'
+});
+
+// Generate report
+const report = await client.generateReport('store_123', {
+  start: '2024-01-01',
+  end: '2024-01-31',
+  type: 'detailed',
+  format: 'csv'
+});
+```
+
+### React Hook
+
+```typescript
+import { useAnalytics } from '@mgzon/analytics-sdk/react';
+
+function ProductPage({ productId }) {
+  const { trackEvent, getAnalytics } = useAnalytics();
+  
+  // Track product view
+  useEffect(() => {
+    trackEvent('product_view', {
+      productId,
+      page: window.location.pathname
+    });
+  }, [productId]);
+  
+  // Get product analytics
+  const { data: productAnalytics } = useQuery(
+    ['product-analytics', productId],
+    () => getAnalytics.product(productId)
+  );
+  
+  return (
+    <div>
+      <h1>Product Analytics</h1>
+      {productAnalytics && (
+        <div>
+          <p>Views: {productAnalytics.views}</p>
+          <p>Conversion Rate: {productAnalytics.conversionRate}%</p>
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## Error Handling
+
+### HTTP Status Codes
+
+| Code | Meaning | Description |
+|------|---------|-------------|
+| 200 | OK | Request successful |
+| 201 | Created | Resource created |
+| 400 | Bad Request | Invalid parameters |
+| 401 | Unauthorized | Authentication required |
+| 403 | Forbidden | Insufficient permissions |
+| 404 | Not Found | Resource not found |
+| 429 | Too Many Requests | Rate limit exceeded |
+| 500 | Internal Server Error | Server error |
+
+### Error Response Format
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "ANALYTICS_ERROR",
+    "message": "Failed to fetch analytics data",
+    "details": {
+      "storeId": "store_123",
+      "period": "30d"
+    },
+    "timestamp": "2024-01-15T10:30:00Z",
+    "requestId": "req_123456789"
+  }
+}
+```
+
+### Common Error Codes
+
+| Error Code | Description | Solution |
+|------------|-------------|----------|
+| `INVALID_PARAMS` | Invalid request parameters | Check parameter format |
+| `STORE_NOT_FOUND` | Store does not exist | Verify store ID/slug |
+| `ACCESS_DENIED` | Insufficient permissions | Check user permissions |
+| `INTEGRATION_ERROR` | External integration failed | Check integration status |
+| `RATE_LIMITED` | Too many requests | Wait before retrying |
+
+## Rate Limiting
+
+### Default Limits
+
+```typescript
+const rateLimits = {
+  // API limits per hour
+  api: {
+    free: 1000,
+    basic: 10000,
+    pro: 100000,
+    enterprise: 1000000
+  },
+  
+  // Event tracking limits per minute
+  events: {
+    free: 100,
+    basic: 1000,
+    pro: 10000,
+    enterprise: 100000
+  }
+};
+```
+
+### Checking Rate Limits
+
+```http
+GET /rate-limits
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "limits": {
+    "requests_per_hour": 10000,
+    "events_per_minute": 1000
+  },
+  "usage": {
+    "requests_this_hour": 2450,
+    "events_this_minute": 150,
+    "remaining_requests": 7550,
+    "reset_in": 2150  // seconds
+  }
+}
+```
+
+## Versioning
+
+API is versioned through the URL path:
+
+```
+/v1/analytics/*          # Current stable version
+/v1beta/analytics/*      # Beta features
+```
+
+### Deprecation Policy
+
+1. **6 months notice** before breaking changes
+2. **12 months support** for deprecated versions
+3. **Automatic migration** guides provided
+
+---
+
+*API documentation version: v1.5.0*
+*Last updated: April 2024*
+```

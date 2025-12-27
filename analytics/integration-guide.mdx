@@ -1,0 +1,836 @@
+```mdx
+---
+title: Integration Guide
+description: Complete guide to integrating with Analytics System
+---
+
+# Integration Guide
+
+## Overview
+
+This guide covers how to integrate various analytics providers with the platform's Analytics System.
+
+## Integration Types
+
+### 1. Google Analytics 4 Integration
+
+#### Prerequisites
+- Google Analytics 4 property
+- Service account with reporting permissions
+- Measurement Protocol API access
+
+#### Configuration Steps
+
+```javascript
+// Step 1: Create service account
+const ga4Config = {
+  type: 'service_account',
+  project_id: 'your-project-id',
+  private_key_id: 'your-private-key-id',
+  private_key: '-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n',
+  client_email: 'service-account@your-project.iam.gserviceaccount.com',
+  client_id: 'your-client-id',
+  auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+  token_uri: 'https://oauth2.googleapis.com/token',
+  auth_provider_x509_cert_url: 'https://www.googleapis.com/oauth2/v1/certs',
+  client_x509_cert_url: 'https://www.googleapis.com/robot/v1/metadata/x509/service-account%40your-project.iam.gserviceaccount.com'
+};
+
+// Step 2: Configure in platform
+await analyticsFunctions.DynamicIntegrationManager.getInstance()
+  .connectIntegration({
+    provider: 'google-analytics-4',
+    credentials: ga4Config,
+    settings: {
+      propertyId: 'GA4_PROPERTY_ID',
+      dataStreamId: 'GA4_DATA_STREAM_ID',
+      apiUrl: 'https://analyticsdata.googleapis.com/v1beta',
+      metrics: ['sessions', 'users', 'screenPageViews', 'transactions'],
+      dimensions: ['country', 'deviceCategory', 'sourceMedium']
+    }
+  });
+```
+
+#### Data Mapping
+
+```typescript
+interface GA4DataMapping {
+  // GA4 metrics to platform metrics
+  metrics: {
+    'sessions': 'sessions',
+    'users': 'uniqueVisitors',
+    'screenPageViews': 'pageViews',
+    'averageSessionDuration': 'avgSessionDuration',
+    'bounceRate': 'bounceRate',
+    'transactions': 'transactions',
+    'totalRevenue': 'revenue'
+  },
+  
+  // GA4 dimensions to platform dimensions
+  dimensions: {
+    'country': 'country',
+    'deviceCategory': 'deviceType',
+    'sourceMedium': 'trafficSource',
+    'sessionDefaultChannelGroup': 'channelGroup'
+  },
+  
+  // Custom calculations
+  calculations: {
+    conversionRate: (data) => (data.transactions / data.sessions) * 100,
+    pagesPerSession: (data) => data.screenPageViews / data.sessions
+  }
+}
+```
+
+### 2. Facebook Pixel Integration
+
+#### Configuration
+
+```javascript
+// Facebook Pixel configuration
+const fbPixelConfig = {
+  pixelId: 'YOUR_PIXEL_ID',
+  accessToken: 'YOUR_ACCESS_TOKEN',
+  apiVersion: 'v17.0',
+  events: [
+    'PageView',
+    'ViewContent',
+    'AddToCart',
+    'InitiateCheckout',
+    'Purchase'
+  ]
+};
+
+// Connect to platform
+await AnalyticsService.connectIntegration({
+  provider: 'facebook-pixel',
+  credentials: {
+    pixelId: fbPixelConfig.pixelId,
+    accessToken: fbPixelConfig.accessToken
+  },
+  settings: {
+    apiUrl: 'https://graph.facebook.com/v17.0',
+    events: fbPixelConfig.events,
+    customConversions: {
+      purchase: {
+        eventName: 'Purchase',
+        valueField: 'value',
+        currencyField: 'currency'
+      }
+    }
+  }
+});
+```
+
+#### Event Tracking Example
+
+```javascript
+// Track Facebook Pixel events through platform
+await AnalyticsService.trackEvent(integrationId, sellerId, {
+  eventName: 'purchase',
+  properties: {
+    value: 199.99,
+    currency: 'USD',
+    content_ids: ['product_123', 'product_456'],
+    content_type: 'product',
+    num_items: 2
+  }
+});
+```
+
+### 3. Custom Analytics Integration
+
+#### Creating Custom Integration
+
+```typescript
+// Define custom integration schema
+interface CustomAnalyticsConfig {
+  providerName: string;
+  type: 'analytics';
+  apiEndpoints: Map<string, string>;
+  authType: 'Bearer' | 'APIKey' | 'Basic' | 'OAuth2';
+  requestMapping: Map<string, any>;
+  responseMapping: Map<string, any>;
+}
+
+// Example: Mixpanel integration
+const mixpanelConfig: CustomAnalyticsConfig = {
+  providerName: 'Mixpanel',
+  type: 'analytics',
+  apiEndpoints: new Map([
+    ['overview', 'https://mixpanel.com/api/2.0/engage'],
+    ['events', 'https://mixpanel.com/api/2.0/events'],
+    ['funnels', 'https://mixpanel.com/api/2.0/funnels']
+  ]),
+  authType: 'Basic',
+  requestMapping: new Map([
+    ['dateRange', (range) => ({
+      from_date: range.start.toISOString().split('T')[0],
+      to_date: range.end.toISOString().split('T')[0]
+    })],
+    ['metrics', (metrics) => ({
+      events: metrics.map(m => ({ event: m }))
+    })]
+  ]),
+  responseMapping: new Map([
+    ['overview', (data) => ({
+      totalUsers: data.results?.total || 0,
+      activeUsers: data.results?.engaged || 0,
+      // ... more mappings
+    })]
+  ])
+};
+```
+
+#### Dynamic Integration Template
+
+```typescript
+// Generic integration template
+class GenericIntegration {
+  constructor(config: IntegrationConfig) {
+    this.config = config;
+  }
+  
+  async fetchData(dataType: string, dateRange: DateRange): Promise<any> {
+    const endpoint = this.config.apiEndpoints.get(dataType);
+    if (!endpoint) {
+      throw new Error(`No endpoint for data type: ${dataType}`);
+    }
+    
+    // Apply request mapping
+    const requestConfig = this.applyRequestMapping(dataType, dateRange);
+    
+    // Make API call
+    const response = await this.makeRequest(endpoint, requestConfig);
+    
+    // Apply response mapping
+    return this.applyResponseMapping(dataType, response);
+  }
+  
+  private async makeRequest(endpoint: string, config: any): Promise<any> {
+    const headers = this.getAuthHeaders();
+    
+    const response = await fetch(endpoint, {
+      method: config.method || 'GET',
+      headers: {
+        ...headers,
+        ...config.headers
+      },
+      body: config.body ? JSON.stringify(config.body) : undefined
+    });
+    
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.statusText}`);
+    }
+    
+    return await response.json();
+  }
+}
+```
+
+### 4. Webhook Integration
+
+#### Setting Up Webhooks
+
+```javascript
+// Configure webhook receiver
+app.post('/webhooks/analytics', async (req, res) => {
+  // Verify signature
+  const signature = req.headers['x-webhook-signature'];
+  const isValid = verifySignature(req.body, signature, WEBHOOK_SECRET);
+  
+  if (!isValid) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  
+  const { event, data, timestamp } = req.body;
+  
+  switch (event) {
+    case 'analytics.updated':
+      // Handle analytics update
+      await handleAnalyticsUpdate(data);
+      break;
+      
+    case 'integration.connected':
+      // Handle integration connection
+      await handleIntegrationConnected(data);
+      break;
+      
+    case 'anomaly.detected':
+      // Handle anomaly detection
+      await handleAnomaly(data);
+      break;
+  }
+  
+  res.status(200).json({ received: true });
+});
+
+// Register webhook with platform
+await fetch('https://api.yourplatform.com/v1/webhooks', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${API_KEY}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    url: 'https://your-domain.com/webhooks/analytics',
+    events: ['analytics.updated', 'anomaly.detected'],
+    secret: WEBHOOK_SECRET
+  })
+});
+```
+
+## Data Synchronization
+
+### Real-time Sync
+
+```typescript
+class RealTimeSync {
+  private websocket: WebSocket;
+  private storeId: string;
+  
+  constructor(storeId: string) {
+    this.storeId = storeId;
+    this.connectWebSocket();
+  }
+  
+  private connectWebSocket() {
+    this.websocket = new WebSocket(`wss://api.yourplatform.com/v1/ws/analytics?storeId=${this.storeId}`);
+    
+    this.websocket.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      this.handleUpdate(data);
+    };
+    
+    this.websocket.onclose = () => {
+      // Reconnect with exponential backoff
+      setTimeout(() => this.connectWebSocket(), 5000);
+    };
+  }
+  
+  private handleUpdate(data: any) {
+    switch (data.type) {
+      case 'metrics_update':
+        this.updateMetrics(data.payload);
+        break;
+      case 'event_stream':
+        this.streamEvent(data.payload);
+        break;
+      case 'alert':
+        this.showAlert(data.payload);
+        break;
+    }
+  }
+}
+```
+
+### Batch Sync
+
+```typescript
+class BatchSync {
+  async syncHistoricalData(integrationId: string, startDate: Date, endDate: Date) {
+    // Split into manageable chunks
+    const chunkSize = 30 * 24 * 60 * 60 * 1000; // 30 days
+    const chunks = this.createDateChunks(startDate, endDate, chunkSize);
+    
+    // Process chunks in parallel (with limits)
+    const results = await Promise.allSettled(
+      chunks.map(chunk => this.syncChunk(integrationId, chunk))
+    );
+    
+    // Handle results
+    const successful = results.filter(r => r.status === 'fulfilled');
+    const failed = results.filter(r => r.status === 'rejected');
+    
+    return {
+      totalChunks: chunks.length,
+      successful: successful.length,
+      failed: failed.length,
+      errors: failed.map(f => (f as PromiseRejectedResult).reason)
+    };
+  }
+  
+  private createDateChunks(start: Date, end: Date, chunkSize: number): Array<{start: Date, end: Date}> {
+    const chunks = [];
+    let currentStart = start;
+    
+    while (currentStart < end) {
+      const currentEnd = new Date(Math.min(currentStart.getTime() + chunkSize, end.getTime()));
+      chunks.push({ start: currentStart, end: currentEnd });
+      currentStart = currentEnd;
+    }
+    
+    return chunks;
+  }
+}
+```
+
+## Error Handling & Retry Logic
+
+```typescript
+class IntegrationErrorHandler {
+  private maxRetries = 3;
+  private retryDelay = 1000; // 1 second
+  
+  async executeWithRetry(operation: () => Promise<any>, context: string) {
+    let lastError: Error;
+    
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        
+        if (this.shouldRetry(error)) {
+          const delay = this.retryDelay * Math.pow(2, attempt - 1);
+          console.log(`Retry ${attempt}/${this.maxRetries} for ${context} in ${delay}ms`);
+          await this.sleep(delay);
+          continue;
+        }
+        
+        // Non-retryable error
+        throw this.enrichError(error, context, attempt);
+      }
+    }
+    
+    // Max retries exceeded
+    throw new Error(`Max retries (${this.maxRetries}) exceeded for ${context}: ${lastError.message}`);
+  }
+  
+  private shouldRetry(error: Error): boolean {
+    // Retry on network errors, rate limits, temporary failures
+    const retryableErrors = [
+      'ETIMEDOUT',
+      'ECONNRESET',
+      'ENOTFOUND',
+      'ECONNREFUSED',
+      '429', // Rate limit
+      '502', // Bad gateway
+      '503', // Service unavailable
+      '504'  // Gateway timeout
+    ];
+    
+    return retryableErrors.some(code => 
+      error.message.includes(code) || 
+      (error as any).code === code
+    );
+  }
+  
+  private enrichError(error: Error, context: string, attempt: number): Error {
+    return new Error(
+      `Integration error in ${context} (attempt ${attempt}): ${error.message}`,
+      { cause: error }
+    );
+  }
+  
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+```
+
+## Monitoring Integration Health
+
+```typescript
+class IntegrationHealthMonitor {
+  private integrations: Map<string, IntegrationHealth> = new Map();
+  
+  async monitorAll(): Promise<IntegrationHealthReport> {
+    const integrations = await this.getActiveIntegrations();
+    const healthChecks = integrations.map(integration => 
+      this.checkHealth(integration)
+    );
+    
+    const results = await Promise.allSettled(healthChecks);
+    
+    const report: IntegrationHealthReport = {
+      timestamp: new Date(),
+      total: integrations.length,
+      healthy: 0,
+      warnings: 0,
+      errors: 0,
+      details: []
+    };
+    
+    results.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        const health = result.value;
+        this.integrations.set(integrations[index].id, health);
+        
+        if (health.status === 'healthy') report.healthy++;
+        else if (health.status === 'warning') report.warnings++;
+        else report.errors++;
+        
+        report.details.push(health);
+      } else {
+        report.errors++;
+        report.details.push({
+          id: integrations[index].id,
+          provider: integrations[index].providerName,
+          status: 'error',
+          error: result.reason.message,
+          lastSync: null,
+          dataPoints: 0
+        });
+      }
+    });
+    
+    return report;
+  }
+  
+  private async checkHealth(integration: Integration): Promise<IntegrationHealth> {
+    try {
+      // Test connection
+      const testResponse = await this.testConnection(integration);
+      
+      // Check last sync time
+      const hoursSinceSync = this.getHoursSinceLastSync(integration.lastSync);
+      
+      // Calculate health score
+      const healthScore = this.calculateHealthScore(
+        testResponse,
+        hoursSinceSync,
+        integration.errorRate
+      );
+      
+      return {
+        id: integration.id,
+        provider: integration.providerName,
+        status: healthScore > 80 ? 'healthy' : healthScore > 50 ? 'warning' : 'error',
+        healthScore,
+        lastSync: integration.lastSync,
+        dataPoints: integration.stats?.dataPoints || 0,
+        errorRate: integration.stats?.errorRate || 0,
+        responseTime: testResponse.time
+      };
+    } catch (error) {
+      return {
+        id: integration.id,
+        provider: integration.providerName,
+        status: 'error',
+        healthScore: 0,
+        error: error.message,
+        lastSync: integration.lastSync,
+        dataPoints: integration.stats?.dataPoints || 0
+      };
+    }
+  }
+}
+```
+
+## Best Practices
+
+### 1. Security Best Practices
+
+```typescript
+// Always encrypt sensitive data
+class SecureIntegration {
+  private encryptionKey: string;
+  
+  async saveCredentials(integrationId: string, credentials: any) {
+    const encrypted = await this.encrypt(JSON.stringify(credentials));
+    
+    await db.integrations.updateOne(
+      { _id: integrationId },
+      { 
+        $set: { 
+          credentials: encrypted,
+          encryptedAt: new Date()
+        }
+      }
+    );
+  }
+  
+  async getCredentials(integrationId: string): Promise<any> {
+    const integration = await db.integrations.findOne({ _id: integrationId });
+    if (!integration?.credentials) {
+      return null;
+    }
+    
+    const decrypted = await this.decrypt(integration.credentials);
+    return JSON.parse(decrypted);
+  }
+  
+  private async encrypt(data: string): Promise<string> {
+    // Use AES-256-GCM for authenticated encryption
+    const algorithm = 'aes-256-gcm';
+    const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
+    const iv = crypto.randomBytes(16);
+    
+    const cipher = crypto.createCipheriv(algorithm, key, iv);
+    let encrypted = cipher.update(data, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    const authTag = cipher.getAuthTag();
+    
+    return JSON.stringify({
+      data: encrypted,
+      iv: iv.toString('hex'),
+      authTag: authTag.toString('hex')
+    });
+  }
+}
+```
+
+### 2. Performance Optimization
+
+```typescript
+class OptimizedIntegration {
+  private cache: Map<string, { data: any, timestamp: number }> = new Map();
+  private cacheTTL = 5 * 60 * 1000; // 5 minutes
+  
+  async getDataWithCache(
+    integrationId: string, 
+    dataType: string, 
+    dateRange: DateRange
+  ): Promise<any> {
+    const cacheKey = this.getCacheKey(integrationId, dataType, dateRange);
+    
+    // Check cache
+    const cached = this.cache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
+      return cached.data;
+    }
+    
+    // Fetch fresh data
+    const data = await this.fetchData(integrationId, dataType, dateRange);
+    
+    // Update cache
+    this.cache.set(cacheKey, {
+      data,
+      timestamp: Date.now()
+    });
+    
+    // Clean old cache entries
+    this.cleanCache();
+    
+    return data;
+  }
+  
+  private getCacheKey(
+    integrationId: string, 
+    dataType: string, 
+    dateRange: DateRange
+  ): string {
+    return `${integrationId}:${dataType}:${dateRange.start.getTime()}:${dateRange.end.getTime()}`;
+  }
+  
+  private cleanCache(): void {
+    const now = Date.now();
+    for (const [key, value] of this.cache.entries()) {
+      if (now - value.timestamp > this.cacheTTL) {
+        this.cache.delete(key);
+      }
+    }
+  }
+}
+```
+
+### 3. Error Recovery
+
+```typescript
+class ResilientIntegration {
+  private fallbackStrategies: Map<string, FallbackStrategy> = new Map();
+  
+  constructor() {
+    // Define fallback strategies for different error types
+    this.fallbackStrategies.set('google-analytics-4', {
+      type: 'static',
+      data: {
+        sessions: 1000,
+        users: 800,
+        pageViews: 5000
+      }
+    });
+    
+    this.fallbackStrategies.set('facebook-pixel', {
+      type: 'estimated',
+      calculate: (lastData) => ({
+        conversions: lastData ? lastData.conversions * 1.1 : 50,
+        revenue: lastData ? lastData.revenue * 1.1 : 1000
+      })
+    });
+  }
+  
+  async getDataWithFallback(
+    integrationId: string,
+    operation: () => Promise<any>
+  ): Promise<any> {
+    try {
+      return await operation();
+    } catch (error) {
+      console.error(`Integration ${integrationId} failed:`, error);
+      
+      // Apply fallback strategy
+      const fallback = this.fallbackStrategies.get(integrationId);
+      if (fallback) {
+        return this.applyFallback(fallback, integrationId);
+      }
+      
+      // Default fallback
+      return this.getDefaultFallbackData();
+    }
+  }
+  
+  private applyFallback(strategy: FallbackStrategy, integrationId: string): any {
+    switch (strategy.type) {
+      case 'static':
+        return strategy.data;
+      case 'estimated':
+        const lastData = this.getLastSuccessfulData(integrationId);
+        return strategy.calculate(lastData);
+      case 'cached':
+        return this.getCachedData(integrationId);
+      default:
+        return this.getDefaultFallbackData();
+    }
+  }
+}
+```
+
+## Testing Integrations
+
+### Integration Test Suite
+
+```typescript
+describe('Analytics Integrations', () => {
+  let integrationManager: DynamicIntegrationManager;
+  
+  beforeEach(() => {
+    integrationManager = DynamicIntegrationManager.getInstance();
+  });
+  
+  describe('Google Analytics 4', () => {
+    test('should connect successfully', async () => {
+      const result = await integrationManager.connectIntegration({
+        provider: 'google-analytics-4',
+        credentials: testGA4Credentials,
+        settings: testSettings
+      });
+      
+      expect(result.success).toBe(true);
+      expect(result.integration.status).toBe('connected');
+    });
+    
+    test('should fetch overview data', async () => {
+      const integration = await integrationManager.getIntegration('ga4-test');
+      const data = await integrationManager.fetchDataFromIntegration(
+        integration,
+        { start: new Date('2024-01-01'), end: new Date('2024-01-31') },
+        'overview'
+      );
+      
+      expect(data).toHaveProperty('sessions');
+      expect(data).toHaveProperty('users');
+      expect(data).toHaveProperty('revenue');
+    });
+  });
+  
+  describe('Error Handling', () => {
+    test('should handle API errors gracefully', async () => {
+      const integration = createMockIntegration({
+        shouldFail: true,
+        errorType: 'rate_limit'
+      });
+      
+      const data = await integrationManager.fetchDataFromIntegration(
+        integration,
+        validDateRange,
+        'overview'
+      );
+      
+      // Should return fallback data
+      expect(data).toBeDefined();
+      expect(data.dataSource).toBe('fallback');
+    });
+    
+    test('should retry on temporary failures', async () => {
+      let attemptCount = 0;
+      const integration = createMockIntegration({
+        shouldFail: () => {
+          attemptCount++;
+          return attemptCount < 3; // Fail first two attempts
+        }
+      });
+      
+      await integrationManager.fetchDataFromIntegration(
+        integration,
+        validDateRange,
+        'overview'
+      );
+      
+      expect(attemptCount).toBe(3); // Should retry until success
+    });
+  });
+});
+```
+
+## Migration Guide
+
+### Migrating from Legacy System
+
+```typescript
+class MigrationAssistant {
+  async migrateLegacyData(storeId: string): Promise<MigrationReport> {
+    const report: MigrationReport = {
+      storeId,
+      startTime: new Date(),
+      metricsMigrated: 0,
+      eventsMigrated: 0,
+      errors: []
+    };
+    
+    try {
+      // Step 1: Migrate historical data
+      report.metricsMigrated = await this.migrateHistoricalMetrics(storeId);
+      
+      // Step 2: Migrate events
+      report.eventsMigrated = await this.migrateEvents(storeId);
+      
+      // Step 3: Update configurations
+      await this.updateConfigurations(storeId);
+      
+      // Step 4: Verify migration
+      const verification = await this.verifyMigration(storeId);
+      report.verification = verification;
+      
+    } catch (error) {
+      report.errors.push({
+        step: 'migration',
+        error: error.message,
+        timestamp: new Date()
+      });
+    } finally {
+      report.endTime = new Date();
+      report.duration = report.endTime.getTime() - report.startTime.getTime();
+    }
+    
+    return report;
+  }
+}
+```
+
+## Support & Troubleshooting
+
+### Common Issues
+
+| Issue | Symptoms | Solution |
+|-------|----------|----------|
+| **Authentication Failed** | 401 errors, "Invalid credentials" | Regenerate API keys, check permissions |
+| **Rate Limiting** | 429 errors, slow responses | Implement exponential backoff, cache data |
+| **Data Discrepancies** | Different numbers across systems | Check timezone settings, data sampling |
+| **Connection Drops** | Intermittent failures, timeouts | Implement reconnection logic, monitor network |
+| **Memory Leaks** | Increasing memory usage | Check for unclosed connections, implement cleanup |
+
+### Getting Help
+
+1. **Check Documentation**: [docs.yourplatform.com/analytics](https://docs.yourplatform.com/analytics)
+2. **Community Forum**: [community.yourplatform.com](https://community.yourplatform.com)
+3. **Support Tickets**: [support.yourplatform.com](https://support.yourplatform.com)
+4. **Emergency Support**: Call +1-XXX-XXX-XXXX for critical issues
+
+---
+
+*Integration Guide version: 2.1.0*
+*Last updated: April 2024*
+```
